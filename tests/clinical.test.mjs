@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {assess,cycleIrregular,cases,questions} from '../dist/clinical.mjs';
+import {assess,cycleIrregular,cases,questions} from '../clinical.mjs';
 
 test('adult combines irregular cycles and androgen excess without morphology',()=>{
   const r=assess({stage:'adult',days:50,cycles:7,gap90:false,hirsutism:true,androgen:false,us:false,amh:false});
@@ -30,4 +30,41 @@ test('both quiz levels have ten answerable questions and cases have valid answer
     for(const q of pool)assert.ok(q.correct>=0&&q.correct<q.a.length);
   }
   for(const c of cases)assert.ok(c.answer>=0&&c.answer<c.choices.length);
+});
+test('missing cycle data is undetermined, not normal',()=>{
+  assert.equal(cycleIrregular({stage:'adult',days:NaN,cycles:NaN,gap90:false}),null);
+  assert.equal(cycleIrregular({stage:'teen',years:2,days:NaN,cycles:6,gap90:false}),null);
+  const r=assess({stage:'adult',days:NaN,cycles:NaN,hirsutism:true});
+  assert.equal(r.irregular,null);assert.equal(r.code,'insufficient');
+});
+test('adult cycles: either interval or frequency alone can be irregular',()=>{
+  assert.equal(cycleIrregular({stage:'adult',days:NaN,cycles:6}),true);
+  assert.equal(cycleIrregular({stage:'adult',days:30,cycles:NaN}),false);
+  assert.equal(cycleIrregular({stage:'adult',days:18,cycles:12}),true);
+  assert.equal(cycleIrregular({stage:'adult',days:30,cycles:12,gap90:true}),true);
+});
+test('teen 1-3 y uses 45-day limit and ignores frequency; >90-day gap counts',()=>{
+  assert.equal(cycleIrregular({stage:'teen',years:1.5,days:44,cycles:6}),false);
+  assert.equal(cycleIrregular({stage:'teen',years:1.5,days:30,cycles:12,gap90:true}),true);
+  assert.equal(cycleIrregular({stage:'teen',years:0.5,days:30,cycles:12,gap90:true}),null);
+});
+test('primary amenorrhea counts as irregular without years since menarche',()=>{
+  const r=assess({stage:'teen',years:NaN,days:NaN,cycles:NaN,primaryAmenorrhea:true,hirsutism:true});
+  assert.equal(r.irregular,true);assert.equal(r.code,'compatible');
+});
+test('teen at-risk needs one feature; none is not labelled at-risk',()=>{
+  assert.equal(assess({stage:'teen',years:4,days:30,cycles:12,hirsutism:true}).code,'at-risk');
+  assert.equal(assess({stage:'teen',years:4,days:30,cycles:12}).code,'insufficient');
+  assert.equal(assess({stage:'teen',years:4,days:NaN,cycles:NaN}).code,'insufficient');
+});
+test('8 or more years after menarche uses adult criteria including morphology',()=>{
+  const r=assess({stage:'teen',years:9,days:50,cycles:7,us:true});
+  assert.equal(r.reclassified,true);assert.equal(r.stage,'adult');assert.equal(r.code,'compatible');assert.equal(r.count,2);
+});
+test('teen first year stays early even with features',()=>{
+  assert.equal(assess({stage:'teen',years:.5,days:50,hirsutism:true}).code,'early');
+});
+test('teen without years since menarche asks for it before labelling',()=>{
+  const r=assess({stage:'teen',years:NaN,days:50,hirsutism:true});
+  assert.equal(r.code,'insufficient');assert.match(r.title,/初經後年數/);
 });

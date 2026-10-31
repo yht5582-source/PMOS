@@ -6,4 +6,13 @@ PMOS（Polyendocrine Metabolic Ovarian Syndrome，原稱 PCOS）繁體中文互�
 
 網站：<https://yht5582-source.github.io/PMOS/>
 
-本地檢查：`node --test tests/clinical.test.mjs`
+本地檢查：`node --test tests/clinical.test.mjs`（14 項）
+
+## v1.1（2026-10-31 除錯）
+
+- 修正測試匯入不存在的 `dist/` 路徑
+- 未填週期資料改為「未能判定」，不再顯示「未符合」
+- 青少年：新增原發性無月經；未填初經後年數會先提示；初經後 ≥8 年自動改用成人標準；無任何特徵不再標為「有風險」
+- 送出後修改欄位會即時更新、新增清除鈕、結果圖示依判讀顯示
+- 病例切換篩選時保留作答；資源加 `?v=` 避免快取舊版
+

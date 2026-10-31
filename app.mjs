@@ -1,35 +1,50 @@
-import {assess,cases,questions,sources} from './clinical.mjs';
+import {assess,cases,questions,sources} from './clinical.mjs?v=1.1';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-const form=$('#diagnostic-form');
-form.addEventListener('change',()=>{
+const form=$('#diagnostic-form'), output=$('#diagnostic-output'), blankOutput=output.innerHTML;
+const icons={red:'!',compatible:'✓',early:'◷','at-risk':'◷',insufficient:'?'};
+let shown=false;
+function syncStage(){
   const teen=form.elements.stage.value==='teen';
   $('#years-wrap').classList.toggle('hidden',!teen);
+  $('#primary-wrap').classList.toggle('hidden',!teen);
   $('#morphology-field').classList.toggle('hidden',teen);
-});
+}
+function readForm(){
+  const f=form.elements, num=name=>f[name].value===''?NaN:Number(f[name].value);
+  return {stage:f.stage.value,years:num('years'),days:num('days'),cycles:num('cycles'),gap90:f.gap90.checked,primaryAmenorrhea:f.stage.value==='teen'&&f.primaryAmenorrhea.checked,hirsutism:f.hirsutism.checked,androgen:f.androgen.checked,us:f.us.checked,amh:f.amh.checked,virilization:f.virilization.checked};
+}
+function renderAssessment(){
+  const v=readForm(), r=assess(v), status=x=>x===null?'未能判定':x?'符合':'未符合';
+  const notes=[];
+  if(r.reclassified)notes.push('初經後已 ≥8 年，已改用成人標準判讀。');
+  if(r.irregular===null&&r.code!=='early'&&r.code!=='red')notes.push('週期條件未能判定，請補週期資料。');
+  output.innerHTML=`<div class="output-icon ${r.code}" aria-hidden="true">${icons[r.code]}</div><span class="kicker">ASSESSMENT · ${r.stage==='adult'?'成人':'青少年'}</span><h3>${esc(r.title)}</h3><p>${esc(r.message)}</p><div class="criteria"><div><span>週期不規則</span><strong>${status(r.irregular)}</strong></div><div><span>高雄激素</span><strong>${status(r.hyper)}</strong></div>${r.stage==='adult'?`<div><span>卵巢形態／AMH</span><strong>${status(r.morphology)}</strong></div><div><span>成人條件數</span><strong>${r.count} / 3</strong></div>`:''}</div><div class="output-note">${notes.map(n=>esc(n)+'<br>').join('')}診斷前仍須排除妊娠（如適用）、甲狀腺、泌乳素、非典型先天性腎上腺增生與其他依情境必要的原因。</div>`;
+}
+syncStage();
+form.addEventListener('input',()=>{form.elements.years.setCustomValidity('');syncStage();if(shown&&form.checkValidity())renderAssessment();});
 form.addEventListener('submit',event=>{
   event.preventDefault();
-  const f=form.elements, stage=f.stage.value;
-  const num=(name)=>f[name].value===''?NaN:Number(f[name].value);
-  if(stage==='teen' && !Number.isFinite(num('years'))){f.years.focus();f.years.setCustomValidity('請填入初經後年數');f.years.reportValidity();return;}
-  f.years.setCustomValidity('');
-  const v={stage,years:num('years'),days:num('days'),cycles:num('cycles'),gap90:f.gap90.checked,hirsutism:f.hirsutism.checked,androgen:f.androgen.checked,us:f.us.checked,amh:f.amh.checked,virilization:f.virilization.checked};
-  const r=assess(v), status=x=>x===null?'未能判定':x?'符合':'未符合';
-  $('#diagnostic-output').innerHTML=`<div class="output-icon ${r.code}">${r.code==='red'?'!':'✓'}</div><span class="kicker">ASSESSMENT · ${stage==='adult'?'成人':'青少年'}</span><h3>${esc(r.title)}</h3><p>${esc(r.message)}</p><div class="criteria"><div><span>週期不規則</span><strong>${status(r.irregular)}</strong></div><div><span>高雄激素</span><strong>${status(r.hyper)}</strong></div>${stage==='adult'?`<div><span>卵巢形態／AMH</span><strong>${status(r.morphology)}</strong></div>`:''}</div><div class="output-note">${Number.isNaN(v.days)&&Number.isNaN(v.cycles)&&!v.gap90?'尚未提供週期資料；此結果不能判定週期條件。<br>':''}診斷前仍須排除妊娠（如適用）、甲狀腺、泌乳素、非典型先天性腎上腺增生與其他依情境必要的原因。</div>`;
-  $('#diagnostic-output').scrollIntoView({behavior:'smooth',block:'nearest'});
+  const v=readForm(), f=form.elements;
+  if(v.stage==='teen'&&!v.primaryAmenorrhea&&!Number.isFinite(v.years)){f.years.setCustomValidity('請填入初經後年數');f.years.reportValidity();return;}
+  shown=true;renderAssessment();
+  output.scrollIntoView({behavior:'smooth',block:'nearest'});
 });
+form.addEventListener('reset',()=>setTimeout(()=>{shown=false;form.elements.years.setCustomValidity('');syncStage();output.innerHTML=blankOutput;}));
 
-let filter='all';
+let filter='all';const caseAnswers={};
 function renderCases(){
   $('#case-list').innerHTML=cases.filter(c=>filter==='all'||c.label.startsWith(filter)).map(c=>`<article class="case-card" id="case-${c.id}"><div class="case-meta"><span>CASE ${c.id}</span><span>${esc(c.label)}</span></div><h3>${esc(c.title)}</h3><p>${esc(c.stem)}</p><div class="case-question"><strong>${esc(c.prompt)}</strong><div class="case-options">${c.choices.map((a,i)=>`<button type="button" data-case="${c.id}" data-choice="${i}"><span>${String.fromCharCode(65+i)}</span>${esc(a)}</button>`).join('')}</div></div><div class="case-reveal" hidden></div></article>`).join('');
+  for(const [id,i] of Object.entries(caseAnswers)){const card=document.getElementById(`case-${id}`);if(card)revealCase(card,cases.find(x=>x.id===id),i);}
 }
 renderCases();
-$('#case-filters').addEventListener('click',e=>{const b=e.target.closest('[data-filter]');if(!b)return;filter=b.dataset.filter;document.querySelectorAll('.filter').forEach(x=>x.classList.toggle('active',x===b));renderCases();});
-$('#case-list').addEventListener('click',e=>{const b=e.target.closest('[data-case]');if(!b)return;const c=cases.find(x=>x.id===b.dataset.case),i=Number(b.dataset.choice),card=b.closest('.case-card');card.querySelectorAll('[data-choice]').forEach(x=>{x.disabled=true;x.classList.toggle('correct',Number(x.dataset.choice)===c.answer);x.classList.toggle('incorrect',Number(x.dataset.choice)===i&&i!==c.answer);});const out=card.querySelector('.case-reveal');out.hidden=false;out.innerHTML=`<div class="answer-label">${i===c.answer?'判斷正確':'再看一次關鍵線索'} · 正解 ${String.fromCharCode(65+c.answer)}</div><p>${esc(c.explain)}</p><div class="next"><strong>下一步</strong><p>${esc(c.next)}</p></div>`;});
+$('#case-filters').addEventListener('click',e=>{const b=e.target.closest('[data-filter]');if(!b)return;filter=b.dataset.filter;document.querySelectorAll('.filter').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',x===b);});renderCases();});
+function revealCase(card,c,i){card.querySelectorAll('[data-choice]').forEach(x=>{x.disabled=true;x.classList.toggle('correct',Number(x.dataset.choice)===c.answer);x.classList.toggle('incorrect',Number(x.dataset.choice)===i&&i!==c.answer);});const out=card.querySelector('.case-reveal');out.hidden=false;out.innerHTML=`<div class="answer-label">${i===c.answer?'判斷正確':'再看一次關鍵線索'} · 正解 ${String.fromCharCode(65+c.answer)}</div><p>${esc(c.explain)}</p><div class="next"><strong>下一步</strong><p>${esc(c.next)}</p></div>`;}
+$('#case-list').addEventListener('click',e=>{const b=e.target.closest('[data-case]');if(!b)return;const c=cases.find(x=>x.id===b.dataset.case),i=Number(b.dataset.choice);caseAnswers[c.id]=i;revealCase(b.closest('.case-card'),c,i);});
 
 let level='住院醫師',index=0,chosen=[],submitted=false;
-function setQuizLevel(newLevel){level=newLevel;index=0;chosen=[];submitted=false;document.querySelectorAll('[data-level]').forEach(b=>b.classList.toggle('selected',b.dataset.level===level));renderQuiz();}
+function setQuizLevel(newLevel){level=newLevel;index=0;chosen=[];submitted=false;document.querySelectorAll('[data-level]').forEach(b=>{b.classList.toggle('selected',b.dataset.level===level);b.setAttribute('aria-pressed',b.dataset.level===level);});renderQuiz();}
 function renderQuiz(){
   const pool=questions.filter(q=>q.level===level),q=pool[index];
   $('#quiz-progress').textContent=submitted?'完成':`題目 ${index+1} / ${pool.length}`;

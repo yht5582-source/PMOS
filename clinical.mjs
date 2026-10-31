@@ -3,28 +3,41 @@ export const sources = [
   {name:'2026 nomenclature update (Monash)',url:'https://www.monash.edu/__data/assets/pdf_file/0009/4360095/Updated-PMOS-Guideline-12-June26.pdf',note:'名稱更新為 PMOS，原指引建議持續適用'}
 ];
 
-export function cycleIrregular({stage,years,days,cycles,gap90}) {
-  if (stage === 'adult') return days > 35 || days < 21 || cycles < 8 || gap90;
-  if (!Number.isFinite(years)) return null;
-  if (years < 1) return null;
-  if (gap90) return true;
-  if (years < 3) return days < 21 || days > 45;
-  return days < 21 || days > 35 || cycles < 8;
+// 2023 指引週期定義：初經 <1 年屬過渡期；1–<3 年 <21 或 >45 天；3 年起（含成人）<21 或 >35 天或每年 <8 次；
+// 初經 1 年後任一次 >90 天；青少年原發性無月經（15 歲或乳房發育 >3 年仍無初經）。未提供任何週期資料時回傳 null。
+const has=x=>Number.isFinite(x);
+export function cycleIrregular({stage,years,days,cycles,gap90,primaryAmenorrhea}) {
+  if (stage === 'teen' && primaryAmenorrhea) return true;
+  if (stage === 'teen') {
+    if (!has(years) || years < 1) return null;
+    if (gap90) return true;
+    if (years < 3) return has(days) ? (days < 21 || days > 45) : null;
+  } else if (gap90) return true;
+  const d=has(days), c=has(cycles);
+  if (!d && !c) return null;
+  return (d && (days < 21 || days > 35)) || (c && cycles < 8);
 }
 
-export function assess(v) {
+export function assess(input) {
+  // 初經後 ≥8 年已達生殖成熟，改用成人標準
+  const reclassified=input.stage==='teen' && !input.primaryAmenorrhea && has(input.years) && input.years>=8;
+  const v=reclassified?{...input,stage:'adult'}:input;
   const irregular=cycleIrregular(v);
   const hyper=!!(v.hirsutism || v.androgen);
   const morphology=v.stage==='adult' && !!(v.us || v.amh);
   const count=Number(irregular===true)+Number(hyper)+Number(morphology);
   let code, title, message;
-  if(v.virilization){code='red';title='需要優先評估警訊';message='快速進展的雄性化或顯著雄激素升高，須先排除腫瘤及其他原因。';}
-  else if(v.stage==='teen' && v.years<1){code='early';title='初經後第一年，避免過早定論';message='此時月經不規則可屬生理現象；追蹤症狀並評估其他病因。';}
+  if(v.virilization){code='red';title='需要優先評估警訊';message='快速進展的雄性化或顯著雄激素升高，須先排除雄激素分泌腫瘤及其他原因，不能直接歸因於 PMOS。';}
+  else if(v.stage==='teen' && !v.primaryAmenorrhea && !has(v.years)){code='insufficient';title='請先填入初經後年數';message='青少年的週期界線依初經後年數而定（<1 年、1–<3 年、3–<8 年）；若尚未初經，請勾選原發性無月經。';}
+  else if(v.stage==='teen' && !v.primaryAmenorrhea && v.years<1){code='early';title='初經後第一年，避免過早定論';message='此時月經不規則可屬生理現象；追蹤症狀並評估其他病因。';}
   else if(v.stage==='teen' && irregular===true && hyper){code='compatible';title='符合青少年診斷條件組合';message='仍須排除其他病因並由臨床醫師確認；青少年不使用超音波或 AMH 作診斷。';}
-  else if(v.stage==='teen'){code='at-risk';title='尚未符合青少年診斷組合';message='若有一項特徵，可列為「有風險」並追蹤；初經後約 8 年達生殖成熟時重新評估。';}
+  else if(v.stage==='teen' && (irregular===true || hyper)){code='at-risk';title='只有一項特徵：列為「有風險」';message='青少年須同時具備週期不規則與高雄激素。可列為有風險並追蹤，初經後約 8 年達生殖成熟時重新評估（屆時可用超音波）。';}
+  else if(v.stage==='teen' && irregular===null){code='insufficient';title='週期資料不足，無法判定';message='請填入典型週期間隔（初經後 3 年起亦可用每年次數），或勾選 >90 天間隔／原發性無月經。';}
+  else if(v.stage==='teen'){code='insufficient';title='目前未見青少年核心特徵';message='週期與高雄激素皆未符合；若症狀持續可追蹤，並依臨床需要評估其他病因。';}
   else if(count>=2){code='compatible';title='符合成人診斷條件組合';message='成人三項中至少兩項；仍須排除其他病因並由臨床醫師確認。';}
+  else if(irregular===null){code='insufficient';title='週期資料不足，無法判定';message='請補典型週期間隔或每年月經次數。若週期不規則且有高雄激素，無須再做超音波或 AMH。';}
   else {code='insufficient';title='目前條件不足以支持診斷';message='補足病史、雄激素評估與必要的影像或 AMH；若週期不規則且有高雄激素，無須再做超音波或 AMH。';}
-  return {code,title,message,irregular,hyper,morphology,count};
+  return {code,title,message,irregular,hyper,morphology,count,stage:v.stage,reclassified};
 }
 
 export const cases=[
