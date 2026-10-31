@@ -1,4 +1,4 @@
-name: Deploy PCOS teaching site
+name: Deploy PMOS teaching site
 on:
   push:
     branches: [main]
