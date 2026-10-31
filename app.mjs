@@ -1,4 +1,4 @@
-import {assess,cases,questions,sources} from './clinical.mjs?v=1.1';
+import {assess,cases,questions,sources} from './clinical.mjs?v=1.2';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -16,11 +16,11 @@ function readForm(){
   return {stage:f.stage.value,years:num('years'),days:num('days'),cycles:num('cycles'),gap90:f.gap90.checked,primaryAmenorrhea:f.stage.value==='teen'&&f.primaryAmenorrhea.checked,hirsutism:f.hirsutism.checked,androgen:f.androgen.checked,us:f.us.checked,amh:f.amh.checked,virilization:f.virilization.checked};
 }
 function renderAssessment(){
-  const v=readForm(), r=assess(v), status=x=>x===null?'未能判定':x?'符合':'未符合';
+  const v=readForm(), r=assess(v), status=x=>x===null?'未能判定':x?'符合':'未符合', cls=x=>x===null?'unknown':x?'yes':'no';
   const notes=[];
   if(r.reclassified)notes.push('初經後已 ≥8 年，已改用成人標準判讀。');
   if(r.irregular===null&&r.code!=='early'&&r.code!=='red')notes.push('週期條件未能判定，請補週期資料。');
-  output.innerHTML=`<div class="output-icon ${r.code}" aria-hidden="true">${icons[r.code]}</div><span class="kicker">ASSESSMENT · ${r.stage==='adult'?'成人':'青少年'}</span><h3>${esc(r.title)}</h3><p>${esc(r.message)}</p><div class="criteria"><div><span>週期不規則</span><strong>${status(r.irregular)}</strong></div><div><span>高雄激素</span><strong>${status(r.hyper)}</strong></div>${r.stage==='adult'?`<div><span>卵巢形態／AMH</span><strong>${status(r.morphology)}</strong></div><div><span>成人條件數</span><strong>${r.count} / 3</strong></div>`:''}</div><div class="output-note">${notes.map(n=>esc(n)+'<br>').join('')}診斷前仍須排除妊娠（如適用）、甲狀腺、泌乳素、非典型先天性腎上腺增生與其他依情境必要的原因。</div>`;
+  output.innerHTML=`<div class="output-icon ${r.code}" aria-hidden="true">${icons[r.code]}</div><span class="kicker">ASSESSMENT · ${r.stage==='adult'?'成人':'青少年'}</span><h3>${esc(r.title)}</h3><p>${esc(r.message)}</p><div class="criteria"><div><span>週期不規則</span><strong class="${cls(r.irregular)}">${status(r.irregular)}</strong></div><div><span>高雄激素</span><strong class="${cls(r.hyper)}">${status(r.hyper)}</strong></div>${r.stage==='adult'?`<div><span>卵巢形態／AMH</span><strong class="${cls(r.morphology)}">${status(r.morphology)}</strong></div><div><span>成人條件數</span><strong>${r.count} / 3</strong></div>`:''}</div><div class="output-note">${notes.map(n=>esc(n)+'<br>').join('')}診斷前仍須排除妊娠（如適用）、甲狀腺、泌乳素、非典型先天性腎上腺增生與其他依情境必要的原因。</div>`;
 }
 syncStage();
 form.addEventListener('input',()=>{form.elements.years.setCustomValidity('');syncStage();if(shown&&form.checkValidity())renderAssessment();});
@@ -58,3 +58,9 @@ function renderQuiz(){
 document.querySelectorAll('[data-level]').forEach(b=>b.addEventListener('click',()=>setQuizLevel(b.dataset.level)));
 renderQuiz();
 $('#source-list').innerHTML=sources.map((s,i)=>`<a class="source-item" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer"><span>0${i+1}</span><span><strong>${esc(s.name)}</strong><small>${esc(s.note)}</small></span><span aria-hidden="true">↗</span></a>`).join('');
+
+// 導覽列：捲動陰影與目前段落標示
+const topbar=$('.topbar'), navLinks=[...document.querySelectorAll('.topbar nav a')];
+addEventListener('scroll',()=>topbar.classList.toggle('scrolled',scrollY>8),{passive:true});
+const spy=new IntersectionObserver(entries=>{for(const e of entries)if(e.isIntersecting)navLinks.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id));},{rootMargin:'-45% 0px -50% 0px'});
+navLinks.forEach(a=>{const t=document.querySelector(a.getAttribute('href'));if(t)spy.observe(t);});
