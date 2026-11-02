@@ -1,12 +1,17 @@
 # PMOS 臨床學習站
 
-PMOS（Polyendocrine Metabolic Ovarian Syndrome，原稱 PCOS）繁體中文互動教學：成人與青少年診斷情境、6 個示範病例、20 題分級考題。
+PMOS（Polyendocrine Metabolic Ovarian Syndrome，原稱 PCOS）繁體中文互動教學：成人與青少年診斷情境、6 個示範病例、20 題分級考題、診斷與治療心智圖。
 
 本網站依 2023 國際實證指引與 2026 年 5 月名稱更新整理，供教學使用，不能取代臨床診斷。
 
 網站：<https://yht5582-source.github.io/PMOS/>
 
-本地檢查：`node --test tests/clinical.test.mjs`（14 項）
+本地檢查：`node --test tests/clinical.test.mjs`（18 項）
+
+## v1.3（2026-11-02 心智圖）
+
+- 新增「心智圖」段落（`#map`）：診斷與評估、治療兩張，枝幹可收合，每項標 2023 指引建議編號，可跳到對應病例
+- 資料在 `clinical.mjs` 的 `maps`，改建議時要一併更新
 
 ## v1.2（2026-10-31 視覺優化）
 
